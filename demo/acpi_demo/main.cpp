@@ -11,10 +11,8 @@ int main ()
     std::cout << "This system has ACPI support!\n";
 
     pfs::acpi acpi;
-    acpi.acquire();
 
-    std::cout << "AC state: " << to_string(acpi.ac_state()) << "\n";
-    std::cout << "Batteries available: " << acpi.batteries_available() << "\n";
+    acpi.dump(std::cout, true);
 
     return 0;
 }

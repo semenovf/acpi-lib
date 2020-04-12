@@ -3,6 +3,7 @@ project(pfs-acpi C CXX)
 
 option(pfs-acpi_BUILD_DEMO "Build Demo" ON)
 
+set(_acpi_interface_str)
 set(SOURCES)
 list(APPEND INCLUDE_DIRS
     "${CMAKE_SOURCE_DIR}/include"
@@ -13,16 +14,37 @@ if (UNIX AND NOT APPLE) # AND NOT CYGWIN
 endif()
 
 if (LINUX)
-    set(LIBACPI_ROOT "${CMAKE_SOURCE_DIR}/3rdparty/libacpi-0.2")
-    list(APPEND SOURCES "${LIBACPI_ROOT}/libacpi.c" "${LIBACPI_ROOT}/list.c")
+    if (EXISTS /sys/class)
+        set(PFS_ACPI_SYS_INTERFACE TRUE)
+        list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/src/acpi_linux.cpp")
+        set(_acpi_interface_str "Linux/sys")
+    else ()
+        set(PFS_ACPI_PROC_INTERFACE TRUE)
+        set(LIBACPI_ROOT "${CMAKE_SOURCE_DIR}/3rdparty/libacpi")
+        list(APPEND SOURCES "${LIBACPI_ROOT}/libacpi.c" "${LIBACPI_ROOT}/list.c")
+        set(_acpi_interface_str "Linux/proc")
+    endif()
+else()
+    list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/src/acpi_none.cpp")
+    set(_acpi_interface_str "Linux/sys")
 endif()
+
+message(STATUS "ACPI interface: " ${_acpi_interface_str})
 
 list(REMOVE_DUPLICATES INCLUDE_DIRS)
 
-message(STATUS "SOURCES: [${SOURCES}]")
-
 add_library(pfs-acpi ${SOURCES})
 target_include_directories(pfs-acpi PUBLIC ${INCLUDE_DIRS})
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (PFS_ACPI_SYS_INTERFACE)
+        target_compile_definitions(pfs-acpi PRIVATE "-DPFS_ACPI_SYS_INTERFACE=1")
+    elseif(PFS_ACPI_PROC_INTERFACE)
+        target_compile_options(pfs-acpi PRIVATE -Wno-format-truncation)
+        target_compile_definitions(pfs-acpi PRIVATE "-DPFS_ACPI_PROC_INTERFACE=1")
+    endif()
+endif()
+
 set_target_properties(pfs-acpi
     PROPERTIES
         POSITION_INDEPENDENT_CODE ON
