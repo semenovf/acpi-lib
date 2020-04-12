@@ -462,7 +462,6 @@ void acpi::dump (std::ostream & out, bool extended_data)
 acpi::acpi ()
 {
     _d.reset(new details::acpi);
-    acquire();
 }
 
 acpi::~acpi()
@@ -471,12 +470,6 @@ acpi::~acpi()
 bool acpi::has_acpi_support ()
 {
     return (chdir(ACPI_PATH_SYS) == 0);
-}
-
-int acpi::acpi_version ()
-{
-    // TODO Implement
-    return 0;
 }
 
 void acpi::acquire (int devices)

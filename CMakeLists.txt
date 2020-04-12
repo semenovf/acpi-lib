@@ -6,8 +6,8 @@ option(pfs-acpi_BUILD_DEMO "Build Demo" ON)
 set(_acpi_interface_str)
 set(SOURCES)
 list(APPEND INCLUDE_DIRS
-    "${CMAKE_SOURCE_DIR}/include"
-    "${CMAKE_SOURCE_DIR}/3rdparty")
+    "${CMAKE_CURRENT_LIST_DIR}/include"
+    "${CMAKE_CURRENT_LIST_DIR}/3rdparty")
 
 if (UNIX AND NOT APPLE) # AND NOT CYGWIN
     set(LINUX TRUE)
@@ -16,16 +16,16 @@ endif()
 if (LINUX)
     if (EXISTS /sys/class)
         set(PFS_ACPI_SYS_INTERFACE TRUE)
-        list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/src/acpi_linux.cpp")
+        list(APPEND SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/acpi_linux.cpp")
         set(_acpi_interface_str "Linux/sys")
     else ()
         set(PFS_ACPI_PROC_INTERFACE TRUE)
-        set(LIBACPI_ROOT "${CMAKE_SOURCE_DIR}/3rdparty/libacpi")
+        set(LIBACPI_ROOT "${CMAKE_CURRENT_LIST_DIR}/3rdparty/libacpi")
         list(APPEND SOURCES "${LIBACPI_ROOT}/libacpi.c" "${LIBACPI_ROOT}/list.c")
         set(_acpi_interface_str "Linux/proc")
     endif()
 else()
-    list(APPEND SOURCES "${CMAKE_SOURCE_DIR}/src/acpi_none.cpp")
+    list(APPEND SOURCES "${CMAKE_CURRENT_LIST_DIR}/src/acpi_none.cpp")
     set(_acpi_interface_str "Linux/sys")
 endif()
 

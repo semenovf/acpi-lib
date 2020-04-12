@@ -91,11 +91,9 @@ public:
     thermal_zone thermal_zone_at (int index) const;
     fan fan_at (int index) const;
 
-    ac_state_enum ac_state () const;
-    static bool has_acpi_support ();
-    static int acpi_version ();
-
     void dump (std::ostream & out, bool extended_data = false);
+
+    static bool has_acpi_support ();
 
 private:
     std::unique_ptr<details::acpi> _d;

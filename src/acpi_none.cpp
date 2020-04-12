@@ -21,11 +21,6 @@ bool acpi::has_acpi_support ()
     return false;
 }
 
-int acpi::acpi_version ()
-{
-    return 0;
-}
-
 void acpi::acquire (int /*devices*/) const
 {}
 
