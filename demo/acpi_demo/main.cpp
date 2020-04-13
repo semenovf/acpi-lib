@@ -11,6 +11,7 @@ int main ()
     std::cout << "This system has ACPI support!\n";
 
     pfs::acpi acpi;
+    acpi.acquire();
 
     acpi.dump(std::cout, true);
 

@@ -44,14 +44,58 @@ public:
 
     void acquire_power_supply (int devices);
     void acquire_thermal (int devices);
-    size_t batteries_available () const;
-    size_t ac_adapters_available () const;
-    size_t thermal_zones_available () const;
-    size_t fans_available () const;
-    battery battery_at (int index) const;
-    ac_adapter ac_adapter_at (int index) const;
-    thermal_zone thermal_zone_at (int index) const;
-    fan fan_at (int index) const;
+
+    size_t batteries_available () const
+    {
+        return _batteries.size();
+    }
+
+    size_t ac_adapters_available () const
+    {
+        return _ac_adapters.size();
+    }
+
+    size_t thermal_zones_available () const
+    {
+        return _thermal_zones.size();
+    }
+
+    size_t fans_available () const
+    {
+        return _fans.size();
+    }
+
+    battery battery_at (int index) const
+    {
+        if (index >= 0 && index < _batteries.size()) {
+            return _batteries[index];
+        }
+        return battery{};
+    }
+
+    ac_adapter ac_adapter_at (int index) const
+    {
+        if (index >= 0 && index < _ac_adapters.size()) {
+            return _ac_adapters[index];
+        }
+        return ac_adapter{};
+    }
+
+    thermal_zone thermal_zone_at (int index) const
+    {
+        if (index >= 0 && index < _thermal_zones.size()) {
+            return _thermal_zones[index];
+        }
+        return thermal_zone{};
+    }
+
+    fan fan_at (int index) const
+    {
+        if (index >= 0 && index < _fans.size()) {
+            return _fans[index];
+        }
+        return fan{};
+    }
 
     void dump (std::ostream & out, bool extended_data);
 
@@ -137,6 +181,12 @@ void acquire_devices (char const * direntry, int devices, Visitor && visitor)
 
 void acpi::acquire_power_supply (int devices)
 {
+    if (devices & pfs::acpi::dev_battery)
+        _batteries.clear();
+
+    if (devices & pfs::acpi::dev_ac_adapter)
+        _ac_adapters.clear();
+
     acquire_devices("power_supply", devices, [this] (char const * direntry, int devices) {
         bool is_battery = false;
         bool is_ac_adapter = false;
@@ -272,7 +322,7 @@ void acpi::acquire_power_supply (int devices)
             ac.name = direntry;
 
             auto online = read_all("online", true);
-            ac.state = ac_state_enum::unsupported;
+            ac.state = ac_state_enum::unknown;
 
             if (!online.empty()) {
                 if (unit_value(online) == 0)
@@ -286,6 +336,12 @@ void acpi::acquire_power_supply (int devices)
 
 void acpi::acquire_thermal (int devices)
 {
+    if (devices & pfs::acpi::dev_thermal_zone)
+        _thermal_zones.clear();
+
+    if (devices & pfs::acpi::dev_fan)
+        _fans.clear();
+
     acquire_devices("thermal", devices, [this] (char const * direntry, int devices) {
         bool is_thermal_zone = false;
         bool is_fan = false;
@@ -330,58 +386,6 @@ void acpi::acquire_thermal (int devices)
 
         }
     });
-}
-
-size_t acpi::batteries_available () const
-{
-    return _batteries.size();
-}
-
-size_t acpi::ac_adapters_available () const
-{
-    return _ac_adapters.size();
-}
-
-size_t acpi::thermal_zones_available () const
-{
-    return _thermal_zones.size();
-}
-
-size_t acpi::fans_available () const
-{
-    return _fans.size();
-}
-
-battery acpi::battery_at (int index) const
-{
-    if (index >= 0 && index < _batteries.size()) {
-        return _batteries[index];
-    }
-    return battery{};
-}
-
-ac_adapter acpi::ac_adapter_at (int index) const
-{
-    if (index >= 0 && index < _ac_adapters.size()) {
-        return _ac_adapters[index];
-    }
-    return ac_adapter{};
-}
-
-thermal_zone acpi::thermal_zone_at (int index) const
-{
-    if (index >= 0 && index < _thermal_zones.size()) {
-        return _thermal_zones[index];
-    }
-    return thermal_zone{};
-}
-
-fan acpi::fan_at (int index) const
-{
-    if (index >= 0 && index < _fans.size()) {
-        return _fans[index];
-    }
-    return fan{};
 }
 
 void acpi::dump (std::ostream & out, bool extended_data)

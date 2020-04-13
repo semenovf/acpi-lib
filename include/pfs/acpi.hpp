@@ -36,7 +36,7 @@ struct battery
 
 enum class ac_state_enum
 {
-      unsupported //!< AC information not supported
+      unknown     //!< AC information unknown or not supported
     , offline     //!< AC adapter is off-line
     , online      //!< AC adapter is on-line
 };
@@ -110,7 +110,7 @@ inline std::string to_string (ac_state_enum state)
             break;
     }
 
-    return "not supported";
+    return "unknown";
 }
 
 inline std::string to_string (charge_state_enum state)
