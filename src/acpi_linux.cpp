@@ -7,6 +7,7 @@
 //      2020.04.10 Initial version
 ////////////////////////////////////////////////////////////////////////////////
 #include "pfs/acpi.hpp"
+#include <string>
 #include <vector>
 #include <cstdio>
 #include <cstring>
@@ -18,7 +19,8 @@
 
 namespace pfs {
 
-static char const * ACPI_PATH_SYS = "/sys/class/";
+static char const * ACPI_POWER_SUPPLY_PATH = "/sys/class/power_supply";
+static char const * ACPI_THERMAL_PATH = "/sys/class/thermal";
 static size_t BUF_SZ = 64;
 static double MIN_CAPACITY = double{0.01};
 static double MIN_PRESENT_RATE = double{0.01};
@@ -106,9 +108,9 @@ private:
     std::vector<fan>              _fans;
 };
 
-static std::string read_all (char const * path, bool remove_trailing_nl = false)
+static std::string read_all (std::string const & path, bool remove_trailing_nl = false)
 {
-    auto input = fopen(path, "r");
+    auto input = fopen(path.c_str(), "r");
 
     if (!input)
         return std::string{};
@@ -152,13 +154,7 @@ inline bool is_dir_entry (struct dirent * de)
 template <typename Visitor>
 void acquire_devices (char const * direntry, int devices, Visitor && visitor)
 {
-    if (chdir(ACPI_PATH_SYS) < 0)
-        return;
-
-    if (::chdir(direntry) < 0)
-        return;
-
-    auto d = ::opendir(".");
+    auto d = ::opendir(direntry);
 
     if (!d)
         return;
@@ -168,10 +164,6 @@ void acquire_devices (char const * direntry, int devices, Visitor && visitor)
     while ((de = ::readdir(d))) {
         if (is_dir_entry(de))
             continue;
-
-        // Restore current directory
-        chdir(ACPI_PATH_SYS);
-        chdir(direntry);
 
         visitor(de->d_name, devices);
     }
@@ -187,31 +179,34 @@ void acpi::acquire_power_supply (int devices)
     if (devices & pfs::acpi::dev_ac_adapter)
         _ac_adapters.clear();
 
-    acquire_devices("power_supply", devices, [this] (char const * direntry, int devices) {
+    acquire_devices(ACPI_POWER_SUPPLY_PATH, devices, [this] (char const * direntry, int devices) {
         bool is_battery = false;
         bool is_ac_adapter = false;
 
-        if (chdir(direntry) == 0) {
-            auto type = read_all("type");
+        std::string root_dir {ACPI_POWER_SUPPLY_PATH};
+        root_dir += '/';
+        root_dir += direntry;
 
-            if (strncasecmp(type.c_str(), "battery", 7) == 0)
-                is_battery = true;
-            else if (strncasecmp(type.c_str(), "mains", 5) == 0)
-                is_ac_adapter = true;
-        } else {
+        auto type = read_all(root_dir + "/type");
+
+        if (type.empty())
             return;
-        }
+
+        if (strncasecmp(type.c_str(), "battery", 7) == 0)
+            is_battery = true;
+        else if (strncasecmp(type.c_str(), "mains", 5) == 0)
+            is_ac_adapter = true;
 
         if (is_battery && (devices & pfs::acpi::dev_battery)) {
             _batteries.emplace_back();
             auto & bat = _batteries.back();
             bat.name = direntry;
 
-            bat.manufacturer = read_all("manufacturer", true);
-            bat.model_name = read_all("model_name", true);
-            bat.technology = read_all("technology", true);
+            bat.manufacturer = read_all(root_dir + "/manufacturer", true);
+            bat.model_name = read_all(root_dir + "/model_name", true);
+            bat.technology = read_all(root_dir + "/technology", true);
 
-            auto charge_state = read_all("status", true);
+            auto charge_state = read_all(root_dir + "/status", true);
             bat.charge_state = charge_state_enum::unknown;
 
             if (strncasecmp(charge_state.c_str(), "disch", 5) == 0)
@@ -222,45 +217,45 @@ void acpi::acquire_power_supply (int devices)
                 bat.charge_state = charge_state_enum::charge;
 
             ////////////////////////////////////////////////////////////////
-            auto remaining_capacity = read_all("charge_now", true);
+            auto remaining_capacity = read_all(root_dir + "/charge_now", true);
             bat.remaining_capacity = -1;
 
             if (!remaining_capacity.empty())
                 bat.remaining_capacity = unit_value(remaining_capacity) / 1000;
 
             ////////////////////////////////////////////////////////////////
-            auto remaining_energy = read_all("energy_now", true);
+            auto remaining_energy = read_all(root_dir + "/energy_now", true);
             bat.remaining_energy = -1;
 
             if (!remaining_energy.empty())
                 bat.remaining_energy = unit_value(remaining_energy) / 1000;
 
             ////////////////////////////////////////////////////////////////
-            auto present_rate = read_all("current_now", true);
+            auto present_rate = read_all(root_dir + "/current_now", true);
             bat.present_rate = -1;
 
             if (present_rate.empty())
-                present_rate = read_all("power_now", true);
+                present_rate = read_all(root_dir + "/power_now", true);
 
             if (!present_rate.empty())
                 bat.present_rate = unit_value(present_rate) / 1000;
 
             ////////////////////////////////////////////////////////////////
-            auto last_capacity = read_all("charge_full", true);
+            auto last_capacity = read_all(root_dir + "/charge_full", true);
             bat.last_capacity = -1;
 
             if (!last_capacity.empty())
                 bat.last_capacity = unit_value(last_capacity) / 1000;
 
             ////////////////////////////////////////////////////////////////
-            auto last_capacity_unit = read_all("energy_full", true);
+            auto last_capacity_unit = read_all(root_dir + "/energy_full", true);
             bat.last_capacity_unit = -1;
 
             if (!last_capacity_unit.empty())
                 bat.last_capacity_unit = unit_value(last_capacity_unit) / 1000;
 
             ////////////////////////////////////////////////////////////////
-            auto voltage = read_all("voltage_now", true);
+            auto voltage = read_all(root_dir + "/voltage_now", true);
             bat.voltage = -1;
 
             if (!voltage.empty())
@@ -321,7 +316,7 @@ void acpi::acquire_power_supply (int devices)
             auto & ac = _ac_adapters.back();
             ac.name = direntry;
 
-            auto online = read_all("online", true);
+            auto online = read_all(root_dir + "/online", true);
             ac.state = ac_state_enum::unknown;
 
             if (!online.empty()) {
@@ -342,27 +337,27 @@ void acpi::acquire_thermal (int devices)
     if (devices & pfs::acpi::dev_fan)
         _fans.clear();
 
-    acquire_devices("thermal", devices, [this] (char const * direntry, int devices) {
+    acquire_devices(ACPI_THERMAL_PATH, devices, [this] (char const * direntry, int devices) {
         bool is_thermal_zone = false;
         bool is_fan = false;
 
-        if (chdir(direntry) == 0) {
-            auto temperature = read_all("temp");
+        std::string root_dir {ACPI_THERMAL_PATH};
+        root_dir += '/';
+        root_dir += direntry;
 
-            if (temperature.empty())
-                is_fan = true;
-            else
-                is_thermal_zone = true;
-        } else {
-            return;
-        }
+        auto temperature = read_all(root_dir + "/temp");
+
+        if (temperature.empty())
+            is_fan = true;
+        else
+            is_thermal_zone = true;
 
         if (is_thermal_zone && (devices & pfs::acpi::dev_thermal_zone)) {
             _thermal_zones.emplace_back();
             auto & tz = _thermal_zones.back();
             tz.name = direntry;
 
-            auto temperature = read_all("temp");
+            auto temperature = read_all(root_dir + "/temp");
             tz.temperature = -1;
 
             if (!temperature.empty())
@@ -372,13 +367,13 @@ void acpi::acquire_thermal (int devices)
             auto & fan = _fans.back();
             fan.name = direntry;
 
-            auto cur_state = read_all("cur_state");
+            auto cur_state = read_all(root_dir + "/cur_state");
             fan.cur_state = -1;
 
             if (!cur_state.empty())
                 fan.cur_state = unit_value(cur_state);
 
-            auto max_state = read_all("max_state");
+            auto max_state = read_all(root_dir + "/max_state");
             fan.max_state = -1;
 
             if (!max_state.empty())
@@ -473,7 +468,13 @@ acpi::~acpi()
 
 bool acpi::has_acpi_support ()
 {
-    return (chdir(ACPI_PATH_SYS) == 0);
+    auto d = ::opendir(ACPI_POWER_SUPPLY_PATH);
+    auto result = (d != nullptr ? true : false);
+
+    if (d)
+        ::closedir(d);
+
+    return result;
 }
 
 void acpi::acquire (int devices)
